@@ -54,7 +54,7 @@ def load_and_score(csv_path: str | Path, model_path: str | Path) -> pd.DataFrame
     model_path = Path(model_path)
     if not csv_path.exists():
         raise FileNotFoundError(
-            f"Missing {csv_path}. Drop the starter file data/accounts_to_score.csv in place."
+            f"Missing {csv_path}. Drop the matching starter CSV in place."
         )
     if not model_path.exists():
         raise FileNotFoundError(

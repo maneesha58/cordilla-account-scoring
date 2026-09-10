@@ -202,9 +202,70 @@ None new this session. Carried forward Session 1: did **not** wrap this in an ag
 ### Still not done
 
 - Run end-to-end (blocked on starter files).
-- Monitoring / drift.
+- Monitoring / drift — started in Session 3.
 - PROPOSAL.md impact numbers.
 - Last research-log entry that packs presentation raw material.
+
+---
+
+## 2026-09-10 — Session 3: monitoring loop + why LangGraph is still not required
+
+Built the second job (`python monitor.py`) without starter files. Same pattern as the agent: clear `FileNotFoundError` until `model.pkl` + both CSVs land. Did not synthesize fake weekly batches to force an ALERT.
+
+### Two loops
+
+```
+[SCORING]  new batch -> frozen model -> ranked list -> reps act
+[MONITOR]  (now) input/score drift vs training
+           (later, when 90-day labels exist) predicted vs actual, by score bucket
+           -> if a check trips N consecutive periods -> ALERT a human
+           -> pause auto-priority / investigate / maybe later retrain
+           retraining is never automatic and is not in this job
+```
+
+These are two cron-shaped scripts, not one agent graph.
+
+### Why LangGraph is not required (for now)
+
+The take-home asks for an agent that *does something with scores* and for monitoring that could actually be built. It does not ask for a graph runtime.
+
+LangGraph is useful when the next step is **chosen at runtime**: tool A vs tool B, retry, wait on a human, loop until a condition. Here:
+
+- Scoring is always load → predict_proba → flag → rank → mock LLM on top N → write files.
+- Monitoring is always score training (baseline) → score this batch → compare → append history → write a report.
+
+There is no branch that needs an LLM to pick a tool. "If calibration trips 3 times, alert" is an `if`, not a graph node. Putting that in LangGraph would look more "AI" and would not change the SDR list or the alert. Session 1 already decided not to oversell unearned agent complexity; wrapping monitoring in a graph would be the same mistake.
+
+Revisit a framework only if we add something that actually branches (HITL approval before a rep sees the list, or a real tool that writes back to Salesforce). Not now.
+
+### What landed
+
+- `monitoring/baseline.py` — score `training_data.csv` with the **frozen** model; store missingness, score mean/std, calibration table. Comment in the JSON: this calibration is optimistic (model was fit on these labels).
+- `monitoring/checks.py` — `intent_drift` (10pp), `score_drift` (0.5 std), `calibration` (bucketed predicted vs `converted_within_90d`). Rank inversion (high bucket converts worse than low) is a WATCH even on train.
+- `monitoring/history.py` — upsert by `period_id` so re-running locally does not look like three weeks passing. Consecutive trip = last 3 *non-skipped* snapshots all tripped.
+- `monitoring/report.py` + `output/monitoring_report.md` — OK / WATCH / ALERT in prose. Alert action: pause score-based auto-priority; fall back to trial then MQLs then web; do not `fit()`.
+- `monitor.py` entrypoint.
+
+Unlabeled `accounts_to_score.csv` can only run **drift** today. Calibration on that file is skipped with an explicit reason until outcomes exist. The calibration *code* still runs for real against the training file so reviewers can see a table, not a comment that says "add monitoring."
+
+### Thresholds are drafts
+
+Same rule as quality flags: do not pretend 10pp / 0.5 std / 3pp came from these CSVs. When the files arrive, compute actual missingness and the train calibration table, then tighten. Until then the checks are the right *shape* (what we'd watch, what noise vs signal means, what fires).
+
+### AI session
+
+Asked to implement monitoring and to log why LangGraph is not required. Implemented the second job as plain functions + a history JSON, not a graph.
+
+### Corrections / overrides of AI output
+
+Carried forward: someone (including an AI default) might reach for LangGraph because "monitoring loop" sounds like a cyclic agent. Overrode that. A loop over weeks is a job scheduler + a function, not LangGraph.
+
+### Still not done
+
+- Run both jobs (blocked on starter files).
+- Revisit quality flags and monitoring thresholds after looking at the CSVs.
+- PROPOSAL.md with impact numbers from training_data.csv.
+- Final research-log entry packing presentation raw material.
 
 ---
 

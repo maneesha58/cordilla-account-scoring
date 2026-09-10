@@ -10,6 +10,7 @@ TODAY = date(2026, 8, 1)
 
 MODEL_PATH = REPO_ROOT / "model" / "model.pkl"
 ACCOUNTS_PATH = REPO_ROOT / "data" / "accounts_to_score.csv"
+TRAINING_PATH = REPO_ROOT / "data" / "training_data.csv"
 OUTPUT_DIR = REPO_ROOT / "output"
 
 # Columns the brief lists as model inputs. Overridden at load time if the
