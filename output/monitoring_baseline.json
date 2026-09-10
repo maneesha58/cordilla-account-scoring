@@ -1,0 +1,39 @@
+{
+  "as_of": "2026-08-01",
+  "source": "D:\\job\\dialpad\\cordillaAccountScoring\\data\\training_data.csv",
+  "n": 1200,
+  "intent_missing_rate": 0.40166666666666667,
+  "mean_score": 0.06614231665297247,
+  "std_score": 0.03161805612828664,
+  "p90_score": 0.10882728170656078,
+  "share_above_bar": 0.14166666666666666,
+  "high_score_bar": 0.1,
+  "calibration": [
+    {
+      "bucket": 0,
+      "n": 400,
+      "mean_predicted": 0.042323999210903136,
+      "actual_rate": 0.0225,
+      "gap": 0.019823999210903137,
+      "enough_n": true
+    },
+    {
+      "bucket": 1,
+      "n": 400,
+      "mean_predicted": 0.05399494453043948,
+      "actual_rate": 0.03,
+      "gap": 0.02399494453043948,
+      "enough_n": true
+    },
+    {
+      "bucket": 2,
+      "n": 400,
+      "mean_predicted": 0.10210800621757482,
+      "actual_rate": 0.1425,
+      "gap": 0.04039199378242517,
+      "enough_n": true
+    }
+  ],
+  "overall_calibration_gap": 0.028070312507922596,
+  "note": "Built by scoring training_data.csv with the frozen model. Calibration here is optimistic (the model was fit on these labels). Production should append a new labeled snapshot when 90-day outcomes land \u2014 do not treat this as a live accuracy number."
+}

@@ -1,0 +1,151 @@
+[
+  {
+    "period_id": "period0_training",
+    "as_of": "2026-08-01",
+    "source": "D:\\job\\dialpad\\cordillaAccountScoring\\data\\training_data.csv",
+    "n": 1200,
+    "metrics": {
+      "intent_missing_rate": 0.40166666666666667,
+      "mean_score": 0.06614231665297247,
+      "p90_score": 0.10882728170656078,
+      "share_above_bar": 0.14166666666666666
+    },
+    "checks": {
+      "intent_drift": {
+        "name": "intent_drift",
+        "tripped": false,
+        "batch": 0.40166666666666667,
+        "baseline": 0.40166666666666667,
+        "delta": 0.0,
+        "threshold": 0.1,
+        "what": "Share of accounts with missing intent_score vs training. A coverage jump means scores are resting on a different mix (vendor gap, not 'low intent')."
+      },
+      "score_drift": {
+        "name": "score_drift",
+        "tripped": false,
+        "batch": 0.06614231665297247,
+        "baseline": 0.06614231665297247,
+        "delta": 0.0,
+        "threshold": 0.01580902806414332,
+        "what": "Mean model score vs training. Catches a silent mix shift (smaller companies, fewer trials) before labels exist."
+      },
+      "p90_drop": {
+        "name": "p90_drop",
+        "tripped": false,
+        "batch": 0.10882728170656078,
+        "baseline": 0.10882728170656078,
+        "delta": 0.0,
+        "threshold": 0.02,
+        "what": "90th-percentile score vs training. Call-list High is always top 10% of *this* file. If p90 drops >0.02, those Highs are relatively less-bad, not still above the historical bar."
+      },
+      "share_above_bar": {
+        "name": "share_above_bar",
+        "tripped": false,
+        "batch": 0.14166666666666666,
+        "baseline": 0.14166666666666666,
+        "delta": 0.0,
+        "threshold": 0.1,
+        "bar": 0.1,
+        "what": "Share of accounts with score \u2265 0.10 (the calibration bar where actual conversion beat the 6.5% baseline). A 10pp drop means fewer accounts clearing a real quality line, even if quantile High still has 30 rows."
+      },
+      "calibration": {
+        "name": "calibration",
+        "tripped": false,
+        "skipped": false,
+        "watch_inversion": false,
+        "overall_gap": 0.028070312507922596,
+        "buckets": [
+          {
+            "bucket": 0,
+            "n": 400,
+            "mean_predicted": 0.042323999210903136,
+            "actual_rate": 0.0225,
+            "gap": 0.019823999210903137,
+            "enough_n": true,
+            "limit": 0.039647998421806274,
+            "tripped": false
+          },
+          {
+            "bucket": 1,
+            "n": 400,
+            "mean_predicted": 0.05399494453043948,
+            "actual_rate": 0.03,
+            "gap": 0.02399494453043948,
+            "enough_n": true,
+            "limit": 0.04798988906087896,
+            "tripped": false
+          },
+          {
+            "bucket": 2,
+            "n": 400,
+            "mean_predicted": 0.10210800621757482,
+            "actual_rate": 0.1425,
+            "gap": 0.04039199378242517,
+            "enough_n": true,
+            "limit": 0.08078398756485033,
+            "tripped": false
+          }
+        ],
+        "what": "Does a high score still mean a higher conversion rate? This is the quiet failure that burned the last Cordilla scorer."
+      }
+    }
+  },
+  {
+    "period_id": "batch_2026-08-01",
+    "as_of": "2026-08-01",
+    "source": "D:\\job\\dialpad\\cordillaAccountScoring\\data\\accounts_to_score.csv",
+    "n": 300,
+    "metrics": {
+      "intent_missing_rate": 0.38666666666666666,
+      "mean_score": 0.06553634311584183,
+      "p90_score": 0.1063430830271232,
+      "share_above_bar": 0.12333333333333334
+    },
+    "checks": {
+      "intent_drift": {
+        "name": "intent_drift",
+        "tripped": false,
+        "batch": 0.38666666666666666,
+        "baseline": 0.40166666666666667,
+        "delta": 0.015000000000000013,
+        "threshold": 0.1,
+        "what": "Share of accounts with missing intent_score vs training. A coverage jump means scores are resting on a different mix (vendor gap, not 'low intent')."
+      },
+      "score_drift": {
+        "name": "score_drift",
+        "tripped": false,
+        "batch": 0.06553634311584183,
+        "baseline": 0.06614231665297247,
+        "delta": 0.0006059735371306413,
+        "threshold": 0.01580902806414332,
+        "what": "Mean model score vs training. Catches a silent mix shift (smaller companies, fewer trials) before labels exist."
+      },
+      "p90_drop": {
+        "name": "p90_drop",
+        "tripped": false,
+        "batch": 0.1063430830271232,
+        "baseline": 0.10882728170656078,
+        "delta": 0.0024841986794375825,
+        "threshold": 0.02,
+        "what": "90th-percentile score vs training. Call-list High is always top 10% of *this* file. If p90 drops >0.02, those Highs are relatively less-bad, not still above the historical bar."
+      },
+      "share_above_bar": {
+        "name": "share_above_bar",
+        "tripped": false,
+        "batch": 0.12333333333333334,
+        "baseline": 0.14166666666666666,
+        "delta": 0.018333333333333326,
+        "threshold": 0.1,
+        "bar": 0.1,
+        "what": "Share of accounts with score \u2265 0.10 (the calibration bar where actual conversion beat the 6.5% baseline). A 10pp drop means fewer accounts clearing a real quality line, even if quantile High still has 30 rows."
+      },
+      "calibration": {
+        "name": "calibration",
+        "tripped": false,
+        "skipped": true,
+        "reason": "no converted_within_90d labels on this file yet",
+        "what": "Predicted vs actual conversion by score bucket."
+      }
+    }
+  }
+]

@@ -12,10 +12,12 @@ from monitoring.checks import (
     calibration_table,
     intent_missing_rate,
     score_mean,
+    score_p90,
     score_std,
+    share_above_bar,
     weighted_calibration_gap,
 )
-from monitoring.config import AS_OF, BASELINE_PATH
+from monitoring.config import AS_OF, BASELINE_PATH, HIGH_SCORE_BAR
 
 
 def build_baseline(
@@ -31,6 +33,9 @@ def build_baseline(
         "intent_missing_rate": intent_missing_rate(scored),
         "mean_score": score_mean(scored),
         "std_score": score_std(scored),
+        "p90_score": score_p90(scored),
+        "share_above_bar": share_above_bar(scored),
+        "high_score_bar": HIGH_SCORE_BAR,
         "calibration": cal,
         "overall_calibration_gap": weighted_calibration_gap(cal),
         "note": (

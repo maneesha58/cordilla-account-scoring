@@ -262,10 +262,106 @@ Carried forward: someone (including an AI default) might reach for LangGraph bec
 
 ### Still not done
 
-- Run both jobs (blocked on starter files).
+- Run both jobs — done in Session 4.
 - Revisit quality flags and monitoring thresholds after looking at the CSVs.
 - PROPOSAL.md with impact numbers from training_data.csv.
 - Final research-log entry packing presentation raw material.
+
+---
+
+## 2026-09-10 — Session 4: first successful run (Python / sklearn mismatch)
+
+`pip install -r requirements.txt` failed on the machine Python **3.13**: pins were sklearn 1.5.1 / numpy 1.26, which have no 3.13 wheels, so pip tried to compile sklearn and died. `run.py` then failed with `No module named pandas` because that install never finished.
+
+Tried sklearn 1.6.1 wheels for 3.13. Unpickle warned (estimators from **1.5.2**) then crashed: `Can't get attribute '__pyx_unpickle_CyHalfBinomialLoss'`. The frozen model is 1.5.2; bumping sklearn to get 3.13 wheels is not an option.
+
+**Fix:** `uv python install 3.12`, new `.venv` on 3.12, pin `scikit-learn==1.5.2` (plus pandas 2.2.2 / numpy 1.26.4 / joblib 1.4.2). README updated. Do not use system `python` if it is 3.13 — activate `.venv` or call `.venv\Scripts\python.exe`.
+
+### First live numbers (not proposal-ready yet)
+
+Scoring: 300 accounts; High 30 / Medium 60 / Low 210 (10%/20%/70% quantiles); **38.7% missing intent_score** (brief said ~40%). Top 20 got reasoning. Wrote `output/prioritized_accounts.csv` and `output/call_list.md`.
+
+Monitoring: **OK**. No consecutive trips. Calibration skipped on the unlabeled score file, as designed.
+
+Next: look at the CSVs and tighten flags / thresholds / impact numbers. PROPOSAL.md still empty.
+
+### Corrections / overrides
+
+Overrode “install latest sklearn on 3.13 so pandas exists.” Matching **1.5.2** on Python 3.12 is the constraint. A newer sklearn that installs is not a model that loads.
+
+---
+
+## 2026-09-10 — Session 5: account_type on the call list
+
+Added `account_type` (Prospect / Suspect / Former Customer) to `output/prioritized_accounts.csv` and the markdown headings. Rank is still by model score; type is context for the rep, not a new ranking formula.
+
+---
+
+## 2026-09-10 — Session 6: drop weak_signal from the published queue
+
+Checked both CSVs: **only `intent_score` has NaNs** (~40% train, ~39% to-score). `trial_started` is always 0/1.
+
+`weak_signal` (missing intent AND no trial) is not a second missing-data field — “no trial” is observed. On the call list it duplicated `intent_score_missing`. Removed it from `prioritized_accounts.csv` and `call_list.md`. Kept `intent_score_missing`.
+
+Still computed internally in `quality.py` so the mock “Why” can mention thin evidence; not shown as a column.
+
+Proposal later: in production, a composite coverage flag could roll up intent + other vendor holes. Not earned on this batch.
+
+---
+
+## 2026-09-10 — Session 7: data, calibration, quantile vs absolute
+
+Live exploration of both CSVs and `model.pkl` (not taken on faith). Applied some of it in code earlier (flags, sklearn 1.5.2); this session records the numbers and the **tiering decision**.
+
+### Data
+
+- Train 1,200 × 12; score 300 × 11 (no target). No duplicate ids; no id overlap; account_type mix matches closely.
+- **Conversion 6.5% (78/1200)** — use this in the proposal, not the brief’s “&lt;1% / low single digits.”
+- By type, almost flat: Former Customer 7.2%, Prospect 6.6%, Suspect 6.0%.
+- `intent_score` missing 40.2% train / 38.7% score; **only NaN column**. Mild size skew (mean emp ~126 present vs ~113 missing).
+- Weak feature–target correlations (max ~0.09 `sales_contacts_90d`). Intent quartiles vs conversion are not a clean gradient.
+- One 4,429-employee account vs median 67 — note, not a code “fix.” Our outlier flag is still &gt;50k so this row is not auto-flagged.
+
+### Model
+
+- Pickle is sklearn **1.5.2**. Pipeline: OHE (`account_type`, `industry`) + `SimpleImputer(median)` on seven numerics + `GradientBoostingClassifier`.
+- Fitted medians (from the object): employee_count=67, **intent_score=25.3**, mql=1, trial_started=0, trial_users=0, web=2, sales_contacts=1.
+- Live batch: max score **0.21**, mean **~0.065**. The “83% likelihood” sketch was never this model.
+
+### In-sample calibration (train, optimistic)
+
+| predicted | n | actual |
+|---|---|---|
+| 0–5% | 555 | 2.7% |
+| 5–10% | 475 | 5.7% |
+| 10–15% | 138 | 17.4% |
+| 15–20% | 27 | 37% |
+| 20–30% | 5 | 40% |
+
+Model underpredicts in upper buckets. Small n at the top. **0.10** is where actual conversion clearly beats 6.5%. A low max score is **not** proof of Cordilla-style drift (that is change **over time**). It is also not a bad model in a 6.5% world — 83% would be overconfidence.
+
+### Output already changed
+
+- Collapsed published DQ to `intent_score_missing` only (Session 6).
+- Agent flags; model still median-imputes. Flag exists because the model cannot say “this intent was fabricated.”
+
+### Tiering — decided, not flipped in `rank.py`
+
+This batch: **~37 accounts ≥ 0.10** vs **30 quantile High**; p90 ≈ **0.106**. Almost the same *today*.
+
+**Quantiles stay on the call list** (top 10% / next 20% / rest). Guarantees ~30 High every week (SDR capacity). Hidden cost: a worse batch still looks like 30 Highs — relative “less bad,” not a real bar. That is the Cordilla *mask* if you only look at the list.
+
+**Absolute 0.10 lives in monitoring** (`p90_drop`, `share_above_bar`). Empty-High would be honest but starves the floor some weeks (expensive FNs) and floods it others. Two jobs: predictable queue vs notice when p90 or share ≥ 0.10 falls vs training.
+
+Precision if asked live: tiering **does not branch** on missing intent. Missing intent **does** change the score (imputer → 25.3) and can therefore change the tier.
+
+### Scoring vs monitoring (override)
+
+Running the frozen model on a fresh batch does **not** detect drift. The old Cordilla scorer kept running. Scoring without the second loop is that trap. Kept explicit: `run.py` vs `monitor.py`.
+
+### AI session
+
+Logged this exploration; kept quantile ranks; added p90 / share-above-0.10 checks; wrote the split into `PROPOSAL.md`.
 
 ---
 

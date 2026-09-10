@@ -19,6 +19,15 @@ INTENT_MISSING_DELTA = 0.10
 # batch is a real mix change; smaller wiggles wait for consecutive periods.
 SCORE_MEAN_STD_MULT = 0.5
 
+# Absolute quality bar from the training calibration table: at predicted >= 0.10,
+# actual conversion clearly beat the 6.5% baseline (17%+ in-sample). Used for
+# MONITORING only — the call list still uses within-batch quantiles so SDR
+# workload stays ~top 10% / next 20%. If p90 or the share above this bar
+# falls, quantile "High" is still printing 30 names while the batch got worse.
+HIGH_SCORE_BAR = 0.10
+P90_DROP = 0.02  # alert if this batch's 90th percentile is 2pp+ below training
+SHARE_ABOVE_BAR_DROP = 0.10  # 10pp fewer accounts clearing 0.10 vs training
+
 # Calibration: |mean predicted − actual conversion| in a bucket.
 # Floor 3pp so we don't trip on 0.4% vs 0.6% with tiny base rates.
 # Also trip if 2× the training-set gap for that bucket (once labels exist).

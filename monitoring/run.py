@@ -23,9 +23,13 @@ from monitoring.checks import (
     calibration_table,
     check_calibration,
     check_intent_drift,
+    check_p90_drop,
     check_score_drift,
+    check_share_above_bar,
     intent_missing_rate,
     score_mean,
+    score_p90,
+    share_above_bar,
 )
 from monitoring.config import (
     AS_OF,
@@ -53,6 +57,11 @@ def _snapshot(
         baseline["mean_score"],
         baseline["std_score"],
     )
+    p90 = check_p90_drop(score_p90(scored), baseline["p90_score"])
+    share = check_share_above_bar(
+        share_above_bar(scored),
+        baseline["share_above_bar"],
+    )
     if labeled:
         table = calibration_table(scored)
         cal = check_calibration(table, baseline.get("calibration"))
@@ -66,10 +75,14 @@ def _snapshot(
         "metrics": {
             "intent_missing_rate": intent_missing_rate(scored),
             "mean_score": score_mean(scored),
+            "p90_score": score_p90(scored),
+            "share_above_bar": share_above_bar(scored),
         },
         "checks": {
             "intent_drift": intent,
             "score_drift": score,
+            "p90_drop": p90,
+            "share_above_bar": share,
             "calibration": cal,
         },
     }
@@ -124,7 +137,7 @@ def run(
 
     consecutive = {
         name: consecutive_trips(history, name)
-        for name in ("intent_drift", "score_drift", "calibration")
+        for name in ("intent_drift", "score_drift", "p90_drop", "share_above_bar", "calibration")
     }
     status = _status(consecutive, [train_snap, batch_snap])
     report = render_report(

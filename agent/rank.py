@@ -20,7 +20,9 @@ def rank_and_tier(df: pd.DataFrame) -> pd.DataFrame:
     not mean "70% will convert" and might create an empty High bucket.
 
     These are call-priority tiers for this batch, not calibrated probabilities.
-    Revisit after seeing the actual score histogram.
+    Absolute quality (score ≥ 0.10, p90 vs training) lives in monitoring, not
+    here — so a worse batch still gets a full High list for SDR capacity, but
+    the monitor can trip when those Highs no longer clear the historical bar.
     """
     out = df.sort_values("score", ascending=False, kind="mergesort").reset_index(drop=True)
     out["rank"] = range(1, len(out) + 1)

@@ -11,19 +11,24 @@ No LangGraph/LangChain. Both flows are straight lines: no tool choice, no retrie
 
 ## Setup
 
+Needs **Python 3.11 or 3.12**. `model.pkl` was trained with scikit-learn 1.5.2, which has no 3.13 wheels. This machine can do:
+
 ```bash
-python -m venv .venv
+uv python install 3.12
+uv venv .venv --python 3.12
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 .venv\Scripts\activate          # Windows
+```
+
+Or, if 3.12 is already on PATH:
+
+```bash
+py -3.12 -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Put the starter artifacts here (do not retrain or regenerate):
-
-- `model/model.pkl`
-- `data/accounts_to_score.csv`
-- `data/training_data.csv` (needed for monitoring baseline and later for impact numbers)
-
-`requirements.txt` is a stand-in until the starter pins arrive. If `model.pkl` fails to unpickle, match the starter's `scikit-learn` version.
+Starter artifacts (do not retrain or regenerate): `model/model.pkl`, `data/accounts_to_score.csv`, `data/training_data.csv`.
 
 ## Run
 
@@ -40,7 +45,7 @@ Treat **2026-08-01** as today. The code does not use the system clock.
 
 Scoring:
 
-- `output/prioritized_accounts.csv` — all accounts: rank, score, tier, intent-missing, weak-signal, reasoning, opener
+- `output/prioritized_accounts.csv` — all accounts: rank, account_id, account_type, score, tier, intent-missing, reasoning, opener
 - `output/call_list.md` — top 20 only, readable for a rep or VP
 
 Monitoring:
@@ -53,9 +58,10 @@ Monitoring:
 
 | Choice | Default | Why |
 |---|---|---|
-| Tiers | High = top 10% of *this batch*, Medium = next 20% | Conversion is rare; a 0.70 probability cutoff is the wrong shape |
+| Tiers | High = top 10% of *this batch*, Medium = next 20% | Predictable SDR workload. Absolute bar (score ≥ 0.10, p90) is monitoring, not the call list |
+| p90 / share ≥ 0.10 | Drop vs training (0.02 / 10pp) | Quantile High can still print 30 names while the batch got worse |
 | Reasoning N | 20 | One focused call block; not 300 mocked LLM calls |
-| Extra flags | trial-without-trial, dupes, bad type, employee outliers, negative counts, weak_signal | Flag only — no imputation. Missing intent is not low intent |
+| Extra flags | trial-without-trial, dupes, bad type, employee outliers, negative counts | Flag only — no imputation. Missing intent is not low intent. Call list shows `intent_score_missing` only (only NaN in these CSVs). |
 | LLM | Mock with a real prompt and a commented API slot | Brief: a documented mock is judged the same as a live call |
 | Intent drift | 10pp vs training missingness | Coverage mix change, not sampling noise on n≈300 |
 | Score drift | 0.5 × training std of mean score | Mix shift before labels exist |

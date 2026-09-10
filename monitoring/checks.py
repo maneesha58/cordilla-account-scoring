@@ -9,10 +9,13 @@ import pandas as pd
 from monitoring.config import (
     CALIBRATION_GAP_FLOOR,
     CALIBRATION_GAP_MULT,
+    HIGH_SCORE_BAR,
     INTENT_MISSING_DELTA,
     MIN_BUCKET_N,
     N_SCORE_BUCKETS,
+    P90_DROP,
     SCORE_MEAN_STD_MULT,
+    SHARE_ABOVE_BAR_DROP,
 )
 
 
@@ -95,6 +98,14 @@ def rank_inverted(table: list[dict[str, Any]]) -> bool:
     return high["actual_rate"] < low["actual_rate"]
 
 
+def score_p90(df: pd.DataFrame) -> float:
+    return float(df["score"].quantile(0.90))
+
+
+def share_above_bar(df: pd.DataFrame, bar: float = HIGH_SCORE_BAR) -> float:
+    return float((df["score"] >= bar).mean())
+
+
 def check_intent_drift(batch_rate: float, baseline_rate: float) -> dict[str, Any]:
     delta = abs(batch_rate - baseline_rate)
     return {
@@ -126,6 +137,51 @@ def check_score_drift(batch_mean: float, baseline_mean: float, baseline_std: flo
         "what": (
             "Mean model score vs training. Catches a silent mix shift "
             "(smaller companies, fewer trials) before labels exist."
+        ),
+    }
+
+
+def check_p90_drop(batch_p90: float, baseline_p90: float) -> dict[str, Any]:
+    """Quantile High still names 30 accounts even if this week's 'best' got worse.
+
+    p90 falling while the call list still looks tidy is the Cordilla mask:
+    relative tiers renormalize every batch; this check does not.
+    """
+    drop = baseline_p90 - batch_p90
+    return {
+        "name": "p90_drop",
+        "tripped": drop > P90_DROP,
+        "batch": batch_p90,
+        "baseline": baseline_p90,
+        "delta": drop,
+        "threshold": P90_DROP,
+        "what": (
+            f"90th-percentile score vs training. Call-list High is always "
+            f"top 10% of *this* file. If p90 drops >{P90_DROP:.2f}, those Highs "
+            f"are relatively less-bad, not still above the historical bar."
+        ),
+    }
+
+
+def check_share_above_bar(
+    batch_share: float,
+    baseline_share: float,
+    bar: float = HIGH_SCORE_BAR,
+) -> dict[str, Any]:
+    drop = baseline_share - batch_share
+    return {
+        "name": "share_above_bar",
+        "tripped": drop > SHARE_ABOVE_BAR_DROP,
+        "batch": batch_share,
+        "baseline": baseline_share,
+        "delta": drop,
+        "threshold": SHARE_ABOVE_BAR_DROP,
+        "bar": bar,
+        "what": (
+            f"Share of accounts with score ≥ {bar:.2f} (the calibration bar "
+            f"where actual conversion beat the 6.5% baseline). A 10pp drop "
+            f"means fewer accounts clearing a real quality line, even if "
+            f"quantile High still has 30 rows."
         ),
     }
 

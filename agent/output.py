@@ -11,10 +11,10 @@ from agent.config import OUTPUT_DIR, REASONING_N
 OUTPUT_COLUMNS = [
     "rank",
     "account_id",
+    "account_type",
     "score",
     "tier",
     "intent_score_missing",
-    "weak_signal",
     "reasoning",
     "opener",
 ]
@@ -35,11 +35,19 @@ def build_output(
             table[col] = ""
     table = table[OUTPUT_COLUMNS]
 
-    csv_path = output_dir / "prioritized_accounts.csv"
-    table.to_csv(csv_path, index=False)
-
     md_path = output_dir / "call_list.md"
     md_path.write_text(_to_markdown(table.head(top_n)), encoding="utf-8")
+
+    csv_path = output_dir / "prioritized_accounts.csv"
+    try:
+        table.to_csv(csv_path, index=False)
+    except PermissionError:
+        csv_path = output_dir / "prioritized_accounts_new.csv"
+        table.to_csv(csv_path, index=False)
+        print(
+            f"Could not overwrite prioritized_accounts.csv (file is open). "
+            f"Wrote {csv_path} instead — close the original and rerun, or rename this file."
+        )
     return table
 
 
@@ -53,13 +61,12 @@ def _to_markdown(top: pd.DataFrame) -> str:
     ]
     for _, row in top.iterrows():
         missing = "yes" if bool(row["intent_score_missing"]) else "no"
-        weak = "yes" if bool(row.get("weak_signal", False)) else "no"
         lines.extend(
             [
-                f"## {int(row['rank'])}. `{row['account_id']}` — {row['tier']} "
-                f"(score {float(row['score']):.3f})",
+                f"## {int(row['rank'])}. `{row['account_id']}` — {row.get('account_type', '')} "
+                f"— {row['tier']} (score {float(row['score']):.3f})",
                 "",
-                f"- Intent missing: {missing} · Weak signal: {weak}",
+                f"- Intent missing: {missing}",
                 f"- Why: {row['reasoning'] or '—'}",
                 f"- Opener: {row['opener'] or '—'}",
                 "",

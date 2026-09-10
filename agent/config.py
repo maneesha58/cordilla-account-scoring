@@ -32,8 +32,8 @@ NON_FEATURE_COLUMNS = {"account_id", "snapshot_date", "converted_within_90d"}
 # Top-N get LLM reasoning. ~20 is one focused SDR call block, not 300 API calls.
 REASONING_N = 20
 
-# Within-batch tiers (not calibrated P(convert)). Conversion is rare; fixed
-# 0.5/0.7 cutoffs would likely dump everyone into Low. Revisit once we see
-# the actual score histogram from model.pkl.
+# Within-batch tiers (not calibrated P(convert)). High = top 10% of THIS file
+# so SDR workload stays predictable. The 0.10 absolute bar (where training
+# conversion beat the 6.5% baseline) is a monitoring check, not a call-list cut.
 HIGH_QUANTILE = 0.90  # top 10% of this batch → High (call this week)
 MEDIUM_QUANTILE = 0.70  # next 20% → Medium (second pass)
