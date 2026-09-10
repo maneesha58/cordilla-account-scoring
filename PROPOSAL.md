@@ -6,27 +6,21 @@ Cordilla already has a frozen conversion model (`model.pkl`). This work puts its
 
 ## Impact
 
-**Decision maker.** An SDR or AM chooses which account gets the next 30 minutes. The VP of Sales cares about the aggregate: are those minutes landing on accounts with higher expected conversion than a guess?
+**The decision this changes.** Cordilla has thousands of Prospects, Suspects, and Former Customers and a sales team with limited time. Reps currently guess who to call. The unused frozen model scores likelihood of converting within 90 days. The decision it informs: **which accounts does a rep call first this week.** Type alone does not answer that (Former Customer 7.2%, Prospect 6.6%, Suspect 6.0% on the 1,200-row training file). Measured baseline: **78/1,200 converted (6.5%)** — not the brief’s “well under 1%” range.
 
-**What the data actually says.** On `training_data.csv` (1,200 labeled accounts, snapshot treated as 2026-08-01), **78 converted (6.5%)**. That is the measured baseline — not the brief’s “well under 1% cold / low single digits engaged” range.
+**What it’s worth if it works.** Tiers in code are quantiles of *this* scoring batch (High = top 10%, Medium = next 20%). I took **those same score cutoffs** (this week’s 90th/70th percentile, not “top 10% of training”) and applied them back to historical training outcomes:
 
-Conversion is almost flat by `account_type`: Former Customer 7.2%, Prospect 6.6%, Suspect 6.0%. Type alone does not tell a rep who to call. `intent_score` is missing on 40.2% of training rows and 38.7% of the 300-row score file; it is the **only** column with NaNs. Missingness skews mildly toward smaller companies (mean employees ~113 missing vs ~126 present), not a dramatic split.
-
-Scoring the training file with the frozen model (in-sample — optimistic):
-
-| Predicted score | n | Actual conversion |
+| Tier | Historical conversion | vs 6.5% baseline |
 |---|---|---|
-| 0–5% | 555 | 2.7% |
-| 5–10% | 475 | 5.7% |
-| 10–15% | 138 | 17.4% |
-| 15–20% | 27 | 37% (small n) |
-| 20–30% | 5 | 40% (very small n) |
+| High | 24.4% (32/131) | ~3.8× |
+| Medium | 8.5% (19/223) | ~1.3× |
+| Low | 3.2% (27/846) | below baseline |
 
-Above about **0.10**, actual conversion clearly beats 6.5%. Below 0.05 it is worse. The model **underpredicts** in the upper buckets even on its own training data. The 300-account live batch has **max score 0.21, mean ~0.065**. A row that said “83% likelihood” would have been a lie. In a 6.5% world, frequent 80% scores would be overconfidence, not quality. Lift is **relative**: a 0.15–0.21 account is on the order of 2–3× the baseline, not a sure close.
+Accounts the system would label High converted at **nearly 4×** a random account. On this 300-row batch that is 30 High / 60 Medium / 210 Low. If the batch behaves like history: **30 High calls → ~7 expected conversions** vs **30 random calls → ~2**. Same effort, **roughly five more conversions** — pointing reps at the right 10%, not calling more people. The model’s top score is still only **0.21**; this is a rare-event business, not 83% confidence on any one row. Medium (8.5%) is the second pass, not “ignore everyone else.”
 
-**Capacity, not accuracy.** Suppose a rep can work ~30 accounts with care this cycle (the size of our High bucket). Random 30 at 6.5% is about 2 expected conversions. Thirty accounts from the region that actually converted ~14–17% is a few more — small counts, in-sample, but the mechanism is concentrating time, not contacting more people. False positives waste a call. False negatives (skipping a winner) lose revenue quietly and are worse. We still show High names; we do not auto-drop accounts just because intent is missing.
+**If it’s wrong, in each direction.** A High account that does not convert costs **rep time** on the wrong 30 instead of a different 30 — real, bounded, recoverable next batch. A winner sitting in Low is worse because it is **silent**: Low still held 27 historical conversions (3.2%, not zero). Working only High is a **bet** that concentrating on the highest-lift segment beats spreading thin — not a claim that Low never converts.
 
-**Wrong in each direction.** Calling a dead High wastes SDR time and can annoy a prospect. Parking a real winner in Low because the score is 0.04 is a silent miss. The agent must not pretend 0.21 is 83%, and must not hide missing intent behind the imputer.
+**Caveats, said plainly.** This is **association, not causation**. High accounts already looked more engaged (trial, MQLs, intent); we are better at *finding* accounts trending toward conversion, not proven to *create* conversions that would not have happened. This split is **in-sample** (same file the model was trained on), so it is a best-case read; live batches may be softer. High n=131 is enough to trust the pattern, not to treat “+5 conversions” as a guarantee. Treat it as a real historical signal worth acting on and watching (see Monitoring).
 
 ## Agent
 
@@ -36,7 +30,7 @@ The pipeline inside `model.pkl` is OneHotEncoder (`account_type`, `industry`) + 
 
 **Call-list tiers stay quantiles** of this batch: High = top 10%, Medium = next 20%, Low = rest. On this file that is 30 / 60 / 210. This week’s 90th percentile is ~0.106, next to the 0.10 calibration bar (~37 accounts ≥ 0.10), so the two rules almost agree **today**. They will not agree if the world gets worse: quantiles still emit 30 Highs. That is a feature for **workload** (VP still gets a list) and a bug for **honesty**. Absolute 0.10 / 0.05 on the queue would make empty-High weeks visible, but would also starve the floor some weeks (bad when false negatives are expensive) and flood it others. So: **quantiles for the SDR, absolute bar for monitoring.**
 
-**Why + opener only on High, not a separate top-20.** An earlier cut generated copy for 20 rows while High was 30, so ranks 21–30 showed as High with blank fields. That was a bug, not a product choice. Write-ups now follow the **tier boundary**. Medium and Low stay blank on purpose: a rep is not working 270 extra accounts this cycle, and LLM copy would go stale before it was read. Cost/latency for unused text is not worth it.
+**Why + opener only on High.** An earlier cut generated copy for 20 rows while High was 30, so ranks 21–30 showed as High with blank fields. Write-ups now follow the **tier**. Medium and Low stay blank: a rep is not working 270 extra accounts this cycle.
 
 This is a **batch job** (daily/weekly): pull the file → frozen model → rank all 300 → reason High only → `prioritized_accounts.csv` (all 300, audit/monitoring) and `call_list.md` (High only, rep-facing). Accounts that stay High across weeks are **regenerated each run** so the list matches current features. Caching/dedup is a future optimization, not built here.
 

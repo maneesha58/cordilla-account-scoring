@@ -402,3 +402,9 @@ Also stripped `(score 0.209)` from `call_list.md` headings so the SDR view match
 
 ---
 
+## 2026-09-10 — Session 10: impact numbers into PROPOSAL.md
+
+Replaced the weaker “14–17% / a few more conversions” framing with the historical **quantile-cut** lift: High 24.4% (32/131) vs 6.5% baseline (~3.8×); Medium 8.5%; Low 3.2%. Same 30 calls: ~7 vs ~2 expected. Cutoffs are **this scoring batch’s 90th/70th**, applied back to training — not “top 10% of train.” Caveats in the proposal: association not causation, in-sample, roughly +5 not a guarantee, Low still converts, Medium is the second pass.
+
+---
+
