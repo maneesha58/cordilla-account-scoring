@@ -365,3 +365,40 @@ Logged this exploration; kept quantile ranks; added p90 / share-above-0.10 check
 
 ---
 
+## 2026-09-10 — Session 8: High-tier / reasoning boundary mismatch
+
+Caught in review: High = top 10% (**30** accounts) but reasoning + opener only ran for **20**. Ranks 21–30 would show as High on the call list with blank why/opener — the kind of hole a panelist probes live. “20 was a round number” is not a defense.
+
+**Fix:** write-ups follow the **tier**, not a separate N. Every High row gets reasoning + opener. Medium/Low stay blank on purpose: a rep is not working the other ~270 this cycle; generating that copy is wasted cost/latency for text that goes stale. Stated in `PROPOSAL.md`, not left implicit.
+
+**Cadence:** batch job daily/weekly, not per-call. Each run: fresh file → frozen model → rank all 300 → reason High only → `prioritized_accounts.csv` (all 300, audit) + `call_list.md` (High, rep-facing). No cache/dedup for accounts that stay High across runs — regenerate every time so the list matches current data. Caching noted as a future optimization, not built (4-hour scope).
+
+---
+
+## 2026-09-10 — Session 9: system prompt + mock aligned to findings
+
+Updated `SYSTEM_PROMPT` and the mock together. A prompt-only change would not have moved `call_list.md` — the mock writes those fields.
+
+What went into the prompt (and the mock, so output matches):
+
+- Dropped `weak_signal` from prompt fields. Only `intent_score_missing` (only NaN in these CSVs). Kept dataframe column `score` — a draft used `pred_score`, which is not a column here.
+- Former Customer opener = re-engagement first, even if they have a trial. Prospect/Suspect = discovery. This was agreed earlier but the **prompt** never said it; the mock used trial before account type, so **ACC-00371** (Former Customer + trial) got a trial opener.
+- Never describe the score as a % chance / calibrated probability, **with the calibration reason** (stated numbers don’t match outcomes, especially high end). Mock now says “High priority,” not `score 0.209`.
+- Opener hard cap **25 words** (checked in `generate_reasoning`). Max on this run: 18.
+- Intent missing: say coverage gap, mention the **25.3** impute is not a real reading, lean on other activity.
+
+Typo `YSTEM_PROMPT` was in an **earlier draft outside this file**, not in the repo — constant was already `SYSTEM_PROMPT`.
+
+### Four-account check (after re-run)
+
+| ID | Expected | Actual |
+|---|---|---|
+| ACC-01491 Prospect, trial, High | Discovery + trial | Rank #1 High priority; trial/MQL/contacts; opener 17 words, trial discovery. OK |
+| ACC-00371 Former Customer, trial, High | Re-engage, not cold/trial-first | Opener now “Since you left, I saw a new Cordilla trial…” — **this was the real gap**; old mock failed here |
+| ACC-00646 Prospect, intent missing, High | Not “low intent”; cite 25.3 | Caveat + MQLs/web/contacts; MQL opener. OK |
+| ACC-01212 Prospect, Low, rank 167 | No write-up (High-only) | Blank. Not a prompt-drift test — Low never hits this prompt |
+
+Also stripped `(score 0.209)` from `call_list.md` headings so the SDR view matches “priority, not a percentage.” Raw score stays on the CSV for audit/monitoring.
+
+---
+

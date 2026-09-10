@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+OPENER_MAX_WORDS = 25
+
+# Fitted SimpleImputer median for intent_score (from model.pkl). Not a real reading.
+INTENT_IMPUTE_MEDIAN = 25.3
+
 # ---------------------------------------------------------------------------
 # Prompt we WOULD send. This is the real instruction set, not a placeholder.
 # ---------------------------------------------------------------------------
@@ -11,27 +16,44 @@ from typing import Any, Mapping
 SYSTEM_PROMPT = """You are a sales copilot for Cordilla Systems, a B2B workflow company.
 
 A frozen conversion model has scored one Salesforce account. Your job is to help
-an SDR decide whether and how to call — not to restate the percentage.
+an SDR decide how to open the call — not to restate the score.
 
 Rules:
-- Use only the fields provided. Do not invent revenue, contacts, or activity.
-- Cite 2–3 concrete signals (trial, MQLs, web visits, sales contacts, industry,
-  account type, company size). Prefer present signals over missing ones.
-- Missing intent_score is a coverage gap, NOT low intent. The vendor covers
-  larger / better-known companies more often. Never say "low intent" because
-  the field is empty. If intent_score_missing is true, say the score is less
-  reliable because third-party intent was unavailable.
-- If weak_signal is true, say so in one clause (missing intent and no trial).
-- Do not treat the score as a calibrated probability ("87% chance they buy").
-  Call it a model score / priority signal.
-- Tone: direct, specific, no fluff. The reader has 15 seconds.
+- Use only the fields provided. Do not invent revenue, contacts, activity, or
+  intent that isn't in the data.
+- Cite 2-3 concrete signals from the account's actual values (trial activity,
+  MQLs, web visits, sales contacts, intent score, company size). Prefer signals
+  that are actually present over noting what's absent.
+- intent_score_missing = true means the vendor had no coverage on this company,
+  NOT that the company has low intent. The model fills a missing intent_score
+  with the training-set median (25.3) internally — it is not a real reading.
+  If intent_score_missing is true, say the ranking reflects incomplete signal,
+  and lean on the account's other real activity (MQLs, trial, web visits,
+  sales contacts) instead.
+- Never describe the score as a percentage chance or calibrated probability
+  (e.g. do not say "70% likely to convert" or "score 0.21"). This model's
+  scores are a relative priority ranking within this batch, not a verified
+  real-world probability — checked calibration data shows the model's stated
+  numbers do not reliably match actual outcomes, particularly at the higher
+  end. Refer to it only as "priority" or "ranking," never as a percentage
+  or chance.
+- account_type changes the opener:
+    - "Former Customer": frame as re-engagement / what's changed since they left.
+      Never use a cold-intro opener for a former customer.
+    - "Prospect" or "Suspect": frame as discovery — first-touch, curious, no
+      assumption of prior relationship.
+- Tone: direct, specific, no fluff. The reader has 15 seconds before a call.
+- Keep the opener to one sentence, under 25 words.
 
 Return JSON only, no markdown:
-{"reasoning": "<2-3 sentences for the SDR>", "opener": "<one sentence they can say on a call>"}
+{"reasoning": "<2-3 sentences for the SDR, grounded in this account's actual
+data>", "opener": "<one sentence, under 25 words, the rep can say on the
+call>"}
 """
 
 
 def build_user_prompt(account_data: Mapping[str, Any]) -> str:
+    # Column on the scored frame is `score`, not pred_score.
     fields = [
         "account_id",
         "account_type",
@@ -39,7 +61,6 @@ def build_user_prompt(account_data: Mapping[str, Any]) -> str:
         "employee_count",
         "intent_score",
         "intent_score_missing",
-        "weak_signal",
         "mql_count_90d",
         "trial_started",
         "trial_active_users",
@@ -69,26 +90,36 @@ def _as_bool(value: Any) -> bool:
 
 def _num(value: Any, default: float = 0.0) -> float:
     try:
-        if value is None or (isinstance(value, float) and value != value):  # NaN
+        if value is None or (isinstance(value, float) and value != value):
             return default
         return float(value)
     except (TypeError, ValueError):
         return default
 
 
+def opener_word_count(text: str) -> int:
+    return len(text.replace("—", " ").replace("-", " ").split())
+
+
+def _cap_opener(text: str, max_words: int = OPENER_MAX_WORDS) -> str:
+    words = text.replace("—", " ").split()
+    if len(words) <= max_words:
+        return text.strip()
+    clipped = " ".join(words[:max_words]).rstrip(".,;:")
+    if not clipped.endswith("?"):
+        clipped += "?"
+    return clipped
+
+
 def call_llm_mock(prompt: str, account_data: Mapping[str, Any]) -> dict[str, str]:
     """Stand-in for a live LLM. Same return shape: {reasoning, opener}.
 
-    `prompt` is the full user message we would send (logged / inspectable).
-    The mock ignores the prose of the prompt and uses the structured fields
-    so each account's text actually differs. Keep this logic cheap — it is
-    not the product; the prompt and I/O contract are.
+    Follows SYSTEM_PROMPT: no probability language, Former Customer =
+    re-engagement first, missing intent ≠ low intent, opener ≤ 25 words.
     """
-    _ = prompt  # would be the user message in a real call
+    _ = prompt
 
     # --- REAL API CALL GOES HERE ------------------------------------------
-    # Example (do not uncomment without a key; judged the same as this mock):
-    #
     #   from openai import OpenAI
     #   client = OpenAI()
     #   response = client.chat.completions.create(
@@ -101,9 +132,6 @@ def call_llm_mock(prompt: str, account_data: Mapping[str, Any]) -> dict[str, str
     #       ],
     #   )
     #   return json.loads(response.choices[0].message.content)
-    #
-    # Anthropic equivalent: messages.create(model="claude-sonnet-4-...", ...)
-    # with SYSTEM_PROMPT as `system` and `prompt` as the user turn.
     # ----------------------------------------------------------------------
 
     account_type = account_data.get("account_type", "account")
@@ -115,9 +143,8 @@ def call_llm_mock(prompt: str, account_data: Mapping[str, Any]) -> dict[str, str
     trial_users = _num(account_data.get("trial_active_users"))
     trial = _as_bool(account_data.get("trial_started"))
     intent_missing = _as_bool(account_data.get("intent_score_missing"))
-    weak = _as_bool(account_data.get("weak_signal"))
-    score = _num(account_data.get("score"))
     rank = account_data.get("rank", "?")
+    tier = account_data.get("tier", "High")
     intent = account_data.get("intent_score")
 
     signals: list[str] = []
@@ -131,8 +158,8 @@ def call_llm_mock(prompt: str, account_data: Mapping[str, Any]) -> dict[str, str
         signals.append(f"{int(web)} web touchpoints recently")
     if contacts >= 1:
         signals.append(f"{int(contacts)} sales contacts already logged")
-    if not intent_missing and intent is not None:
-        signals.append(f"vendor intent_score={intent}")
+    if not intent_missing and intent is not None and str(intent) not in {"", "nan"}:
+        signals.append(f"vendor intent reading {intent}")
     if not signals:
         signals.append("mostly firmographic fit rather than recent engagement")
 
@@ -140,45 +167,45 @@ def call_llm_mock(prompt: str, account_data: Mapping[str, Any]) -> dict[str, str
     size = f"{int(emp)}-person" if emp else ""
     who = f"{size} {account_type} in {industry}".strip()
 
-    caveats = []
     if intent_missing:
-        caveats.append(
-            "third-party intent is missing, so do not read that as low intent — "
-            "the vendor just does not cover this account"
+        caveat = (
+            f" Intent is missing — vendor coverage gap, not low intent; "
+            f"the model fills {INTENT_IMPUTE_MEDIAN}, not a real reading. "
+            f"Lean on the activity above."
         )
-    if weak:
-        caveats.append("no trial either, so this score sits on thinner evidence")
-    caveat = " " + ("Also: " + "; ".join(caveats) + ".") if caveats else ""
+    else:
+        caveat = ""
 
     reasoning = (
-        f"Rank #{rank} (score {score:.3f}). {who} stands out because of {cited}."
+        f"Rank #{rank} ({tier} priority). {who} stands out because of {cited}."
         f"{caveat}"
     )
 
-    if trial:
+    former = account_type == "Former Customer"
+    if former and trial:
         opener = (
-            f"I noticed your team is already in a Cordilla trial — got 10 minutes "
-            f"to compare that to how other {industry} teams rolled out?"
+            f"Since you left, I saw a new Cordilla trial — open to a short {industry} catch-up?"
+        )
+    elif former:
+        opener = (
+            f"Wanted to reconnect — what's changed for your {industry} team since Cordilla?"
+        )
+    elif trial:
+        opener = (
+            f"I noticed your team is in a Cordilla trial. Ten minutes to compare with other {industry} teams?"
         )
     elif mqls >= 1:
         opener = (
-            f"You had recent interest from someone on your side — worth a quick "
-            f"call to see if workflow tooling is still on the list?"
+            f"Someone on your side showed interest recently. Still looking at workflow tooling?"
         )
     elif web >= 3:
         opener = (
-            f"Your team has been on our site a few times this quarter — "
-            f"happy to walk through the piece most {industry} teams ask about first."
-        )
-    elif account_type == "Former Customer":
-        opener = (
-            f"Wanted to reconnect now that some workflow teams in {industry} "
-            f"are backfilling after churn — open to a short catch-up?"
+            f"Your team has been on our site this quarter. Quick walkthrough of what {industry} teams ask first?"
         )
     else:
         opener = (
-            f"We work with {industry} teams around your size on workflow ops — "
-            f"open to a brief call this week?"
+            f"We work with {industry} teams your size on workflow ops. Open to a brief call?"
         )
 
+    opener = _cap_opener(opener)
     return {"reasoning": reasoning.strip(), "opener": opener}

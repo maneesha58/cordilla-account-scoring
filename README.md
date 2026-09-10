@@ -46,7 +46,7 @@ Treat **2026-08-01** as today. The code does not use the system clock.
 Scoring:
 
 - `output/prioritized_accounts.csv` — all accounts: rank, account_id, account_type, score, tier, intent-missing, reasoning, opener
-- `output/call_list.md` — top 20 only, readable for a rep or VP
+- `output/call_list.md` — High tier only (this batch: 30), readable for a rep or VP
 
 Monitoring:
 
@@ -60,7 +60,7 @@ Monitoring:
 |---|---|---|
 | Tiers | High = top 10% of *this batch*, Medium = next 20% | Predictable SDR workload. Absolute bar (score ≥ 0.10, p90) is monitoring, not the call list |
 | p90 / share ≥ 0.10 | Drop vs training (0.02 / 10pp) | Quantile High can still print 30 names while the batch got worse |
-| Reasoning N | 20 | One focused call block; not 300 mocked LLM calls |
+| Reasoning | All High-tier rows; not Medium/Low | Matches the call-this-cycle set. Top-20 left 21–30 as High with blank copy |
 | Extra flags | trial-without-trial, dupes, bad type, employee outliers, negative counts | Flag only — no imputation. Missing intent is not low intent. Call list shows `intent_score_missing` only (only NaN in these CSVs). |
 | LLM | Mock with a real prompt and a commented API slot | Brief: a documented mock is judged the same as a live call |
 | Intent drift | 10pp vs training missingness | Coverage mix change, not sampling noise on n≈300 |

@@ -30,13 +30,17 @@ Above about **0.10**, actual conversion clearly beats 6.5%. Below 0.05 it is wor
 
 ## Agent
 
-No LangGraph. The flow is linear: load → `predict_proba` (frozen) → flag missing intent → quantile rank → mocked “why” + opener for the top 20 → write files. There is no tool choice or retry loop. Ranking alone would be `sort_values`; the product is **trust** (`intent_score_missing`) plus **a line a rep can say**.
+No LangGraph. The flow is linear: load → `predict_proba` (frozen) → flag missing intent → quantile rank → mocked “why” + opener for **every High-tier account** → write files. There is no tool choice or retry loop. Ranking alone would be `sort_values`; the product is **trust** (`intent_score_missing`) plus **a line a rep can say**.
 
 The pipeline inside `model.pkl` is OneHotEncoder (`account_type`, `industry`) + SimpleImputer median on seven numerics + GradientBoostingClassifier. Fitted medians include **intent_score = 25.3**. Missing intent is **not** 0 and is **not** dropped. The model always scores as if intent were typical. The agent flags that so a rep can see a High that sits on a fill-in. Tier **logic** does not special-case missingness; missingness **does** move the score, so it can move the tier. That distinction matters live.
 
 **Call-list tiers stay quantiles** of this batch: High = top 10%, Medium = next 20%, Low = rest. On this file that is 30 / 60 / 210. This week’s 90th percentile is ~0.106, next to the 0.10 calibration bar (~37 accounts ≥ 0.10), so the two rules almost agree **today**. They will not agree if the world gets worse: quantiles still emit 30 Highs. That is a feature for **workload** (VP still gets a list) and a bug for **honesty**. Absolute 0.10 / 0.05 on the queue would make empty-High weeks visible, but would also starve the floor some weeks (bad when false negatives are expensive) and flood it others. So: **quantiles for the SDR, absolute bar for monitoring.**
 
-Output: `output/call_list.md` (top 20) and `prioritized_accounts.csv` (all 300) with rank, type, score (audit), tier, intent-missing, reasoning, opener. The LLM is mocked: real system prompt, commented API slot, rule-based copy from actual fields. It does not invent competitors. Production coverage gaps (intent + other vendors) could become one composite flag later; this batch only has intent holes.
+**Why + opener only on High, not a separate top-20.** An earlier cut generated copy for 20 rows while High was 30, so ranks 21–30 showed as High with blank fields. That was a bug, not a product choice. Write-ups now follow the **tier boundary**. Medium and Low stay blank on purpose: a rep is not working 270 extra accounts this cycle, and LLM copy would go stale before it was read. Cost/latency for unused text is not worth it.
+
+This is a **batch job** (daily/weekly): pull the file → frozen model → rank all 300 → reason High only → `prioritized_accounts.csv` (all 300, audit/monitoring) and `call_list.md` (High only, rep-facing). Accounts that stay High across weeks are **regenerated each run** so the list matches current features. Caching/dedup is a future optimization, not built here.
+
+Output columns: rank, type, score (audit), tier, intent-missing, reasoning, opener. The LLM is mocked with a real system prompt (Former Customer = re-engagement, never a cold intro; never describe the score as a % chance — calibration does not match; opener ≤ 25 words). Commented API slot. Copy is grounded in actual fields. Production coverage gaps could become one composite flag later; this batch only has intent holes.
 
 Runs: `python run.py`. As-of date is **2026-08-01**, not the clock. New batches mean the **same** pickle, not `fit()`.
 

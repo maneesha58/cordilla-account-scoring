@@ -13,7 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from agent.config import ACCOUNTS_PATH, MODEL_PATH, OUTPUT_DIR, REASONING_N
+from agent.config import ACCOUNTS_PATH, MODEL_PATH, OUTPUT_DIR
 from agent.output import build_output
 from agent.quality import flag_data_quality
 from agent.rank import rank_and_tier
@@ -25,24 +25,24 @@ def run(
     csv_path: Path = ACCOUNTS_PATH,
     model_path: Path = MODEL_PATH,
     output_dir: Path = OUTPUT_DIR,
-    n: int = REASONING_N,
 ) -> None:
     scored = load_and_score(csv_path, model_path)
     flagged = flag_data_quality(scored)
     ranked = rank_and_tier(flagged)
-    explained = attach_reasoning(ranked, n=n)
-    table = build_output(explained, output_dir=output_dir, top_n=n)
+    explained = attach_reasoning(ranked)
+    table = build_output(explained, output_dir=output_dir)
 
     n_accounts = len(table)
     n_high = int((table["tier"] == "High").sum())
     n_med = int((table["tier"] == "Medium").sum())
     n_low = int((table["tier"] == "Low").sum())
     missing_pct = 100.0 * table["intent_score_missing"].mean()
+    n_reasoned = int((table["reasoning"].astype(str).str.len() > 0).sum())
 
     print(f"Scored {n_accounts} accounts. Model was not retrained.")
     print(f"Tiers — High: {n_high}, Medium: {n_med}, Low: {n_low}.")
     print(f"{missing_pct:.1f}% of accounts have missing intent_score.")
-    print(f"Wrote reasoning for top {min(n, n_accounts)} accounts.")
+    print(f"Wrote reasoning for {n_reasoned} High-tier accounts (not Medium/Low).")
     print(f"CSV: {output_dir / 'prioritized_accounts.csv'}")
     print(f"Call list: {output_dir / 'call_list.md'}")
 
