@@ -1,0 +1,6 @@
+# Pinned loosely until the starter repo arrives. If that repo ships exact
+# versions (especially scikit-learn), replace these so model.pkl unpickles.
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+joblib==1.4.2

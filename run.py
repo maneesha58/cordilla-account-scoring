@@ -1,0 +1,6 @@
+"""Thin entrypoint: python run.py"""
+
+from agent.main import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())
