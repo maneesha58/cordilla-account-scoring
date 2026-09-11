@@ -422,4 +422,92 @@ Rules (in `monitoring/config.py`):
 This 300-row batch: max PSI **0.046** (`intent_score` lowest bin 20.2% → 14.7%). No feature above 0.10. Status still **OK**. Train-vs-train PSI is 0 (sanity).
 
 ---
+## Corrections / Overrides — AI Suggested vs. What I Changed
 
+### 1. Why build an agent if the model already gives a score?
+**AI suggested:** initially framed the agent's value in general terms — 
+ranking, explaining scores, generating an opener — without directly 
+addressing whether ranking alone was enough to justify building anything 
+beyond sorting the model's output.
+
+**I changed it to:** pushed back directly — if all it does is rank by 
+percentage, a rep could just sort a spreadsheet, no agent needed. Forced 
+the AI to concede this and narrow the justification to only what a raw 
+score genuinely can't provide: (1) trust calibration — flagging when a 
+score rests on incomplete/imputed data rather than presenting every score 
+as equally reliable, and (2) turning a number into something immediately 
+actionable (a call opener), not the ranking itself. Final design explicitly 
+states ranking alone would just be sort_values() and is not the product — 
+trust and the opener are.
+
+### 2. Tiering: quantile vs. absolute thresholds
+**AI suggested (before knowing the actual built approach):** proposed 
+absolute score thresholds for High/Medium/Low (e.g. High >= 0.10), grounded 
+in the calibration table.
+
+**I changed it to:** the actual agent uses quantile-based tiers (top 10% / 
+next 20% / rest) for the call list, for a concrete reason the AI's original 
+suggestion didn't account for — scores in this data cluster low (max 0.21), 
+so a fixed absolute cutoff risks emptying or flooding the High tier 
+depending on the batch. But I kept the AI's original absolute-threshold 
+idea rather than discarding it — it's used in monitoring, not the call 
+list: p90_drop and share_above_bar track the real, absolute score level 
+over time specifically so a batch that quietly gets worse doesn't just 
+keep printing "30 Highs" as if everything's fine. Ended up using both, 
+each where it actually fits the job.
+
+### 3. System prompt strictness
+**AI suggested (earlier draft):** a system prompt with a general rule 
+("don't call it a percentage chance") but no explicit reasoning behind it, 
+no distinct handling for Former Customer accounts, and no enforceable 
+length limit on the opener.
+
+**I changed it to:** stricter, more specific version — added an explicit 
+rule that Former Customer accounts get a re-engagement-framed opener, never 
+a cold-intro one; added the actual reasoning behind the no-percentage rule 
+(checked calibration data shows the model's stated numbers don't reliably 
+match real outcomes, especially at the high end) instead of stating it as 
+an unexplained instruction; and added a hard 25-word cap on the opener 
+since "one sentence" alone wasn't a reliably enforced constraint.
+
+
+
+## Final Entry — Base Material for Presentation
+
+### Core numbers
+- Baseline conversion: 6.5% (78/1,200)
+- By account_type: Former Customer 7.2%, Prospect 6.6%, Suspect 6.0% — flat, not a strong driver
+- intent_score missing: 40.2% train / 38.7% scoring batch; only column with any missingness
+- Feature correlations with target all weak (max 0.09); intent_score quartiles non-monotonic
+- Model: OHE (account_type, industry) + median impute + GradientBoostingClassifier
+- Verified imputation medians: employee_count=67, intent_score=25.3, mql=1, trial=0, trial_users=0, web=2, sales_contacts=1
+- Real predict_proba on scoring batch: max 0.21, mean 0.065
+- Tiers (quantile): High ≥0.106 (30), Medium ≥0.073 (60), Low (210)
+- Same cutoffs on training outcomes: High 24.4% (32/131), Medium 8.5% (19/223), Low 3.2% (27/846) — ~3.8x lift
+- Expected: 30 High calls → ~7 conversions vs. ~2 from 30 random
+- Calibration (in-sample): model underpredicts upper buckets — 15-20% bucket actually converted 37% (n=27)
+- Bootstrap test (2,000 no-drift resamples): ~0% false-trip rate on the 5 label-free monitoring checks
+
+### Key assumptions
+- Decision informed: which accounts a rep calls first this week
+- 2026-08-01 = "today" for all recency logic
+- Reasoning/opener generated for High tier only (30), not all 300
+- No agent framework — no dynamic tool choice or loop, so no need for one
+- Quantiles for the call list (predictable ~30); absolute thresholds (p90, share≥0.10) reserved for monitoring, since quantiles alone would still print 30 Highs even if the batch got worse
+- One data-quality flag (intent_score_missing), not two — confirmed no other column has missingness
+- Model stays frozen — no retraining; that's a separate human decision
+- Calibration skipped on live batch (no outcomes for ~90 days) — by design, not a gap
+- Mocked LLM call fully specified (prompt, inputs, schema) — not a placeholder
+
+### Hypotheses checked
+- Missing intent skews toward smaller accounts — confirmed, mild (126 vs 113 employees)
+- Model is well-calibrated — partially rejected, underpredicts at the top end (in-sample only)
+- weak_signal flag adds value beyond intent_score_missing — rejected, redundant, dropped
+- Monitoring thresholds are reasonable — tested empirically, not assumed; confirmed low false-positive rate
+
+### Limitations to own upfront
+- Impact numbers show association, not causation
+- All calibration/lift numbers are in-sample, not held-out — best case
+- Top calibration buckets are small (n=27, n=5) — directionally consistent, still noisy
+- Uniform 3-period alert rule is simpler than optimal; bootstrap results support faster single-period trips for the 5 label-free checks — not built, named as next step
+- Single snapshot — cannot yet confirm if this model is already drifting like Cordilla's; needs real time to observe
