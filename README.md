@@ -64,6 +64,7 @@ Monitoring:
 | Extra flags | trial-without-trial, dupes, bad type, employee outliers, negative counts | Flag only — no imputation. Missing intent is not low intent. Call list shows `intent_score_missing` only (only NaN in these CSVs). |
 | LLM | Mock with a real prompt and a commented API slot | Brief: a documented mock is judged the same as a live call |
 | Intent drift | 10pp vs training missingness | Coverage mix change, not sampling noise on n≈300 |
+| Feature drift | PSI vs train (any >0.25 or 2+ >0.10); bins frozen at period 0 | Input mix shift that can cancel in mean score |
 | Score drift | 0.5 × training std of mean score | Mix shift before labels exist |
 | Calibration | gap > max(3pp, 2× train gap), n≥30 in bucket | Cordilla failure: scores look fine, conversion doesn't |
 | Consecutive | 3 periods | One noisy week is not an alert |

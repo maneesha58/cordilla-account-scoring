@@ -35,5 +35,214 @@
     }
   ],
   "overall_calibration_gap": 0.028070312507922596,
+  "feature_baseline": {
+    "account_type": {
+      "kind": "categorical",
+      "keep": [
+        "Former Customer",
+        "Prospect",
+        "Suspect"
+      ],
+      "keys": [
+        "Former Customer",
+        "Prospect",
+        "Suspect"
+      ],
+      "train_shares": {
+        "Former Customer": 0.13833333333333334,
+        "Prospect": 0.5266666666666666,
+        "Suspect": 0.335
+      }
+    },
+    "industry": {
+      "kind": "categorical",
+      "keep": [
+        "Financial Services",
+        "Healthcare",
+        "Manufacturing",
+        "Professional Services",
+        "Retail",
+        "Software"
+      ],
+      "keys": [
+        "Financial Services",
+        "Healthcare",
+        "Manufacturing",
+        "Professional Services",
+        "Retail",
+        "Software"
+      ],
+      "train_shares": {
+        "Financial Services": 0.14916666666666667,
+        "Healthcare": 0.16333333333333333,
+        "Manufacturing": 0.175,
+        "Professional Services": 0.1675,
+        "Retail": 0.1675,
+        "Software": 0.1775
+      }
+    },
+    "employee_count": {
+      "kind": "quantile",
+      "edges": [
+        "-inf",
+        24.0,
+        50.0,
+        87.0,
+        165.0,
+        "inf"
+      ],
+      "keys": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "train_shares": {
+        "0": 0.20083333333333334,
+        "1": 0.20083333333333334,
+        "2": 0.20083333333333334,
+        "3": 0.19833333333333333,
+        "4": 0.19916666666666666
+      }
+    },
+    "intent_score": {
+      "kind": "quantile",
+      "edges": [
+        "-inf",
+        13.6,
+        21.68,
+        30.3,
+        40.9,
+        "inf"
+      ],
+      "keys": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "train_shares": {
+        "0": 0.201949860724234,
+        "1": 0.1977715877437326,
+        "2": 0.201949860724234,
+        "3": 0.1991643454038997,
+        "4": 0.1991643454038997
+      },
+      "observed_only": true
+    },
+    "mql_count_90d": {
+      "kind": "quantile",
+      "edges": [
+        "-inf",
+        1.0,
+        2.0,
+        "inf"
+      ],
+      "keys": [
+        "0",
+        "1",
+        "2"
+      ],
+      "train_shares": {
+        "0": 0.6908333333333333,
+        "1": 0.14166666666666666,
+        "2": 0.1675
+      }
+    },
+    "trial_started": {
+      "kind": "discrete",
+      "values": [
+        "0",
+        "1"
+      ],
+      "keys": [
+        "0",
+        "1"
+      ],
+      "train_shares": {
+        "0": 0.8141666666666667,
+        "1": 0.18583333333333332
+      }
+    },
+    "trial_active_users": {
+      "kind": "discrete",
+      "values": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "keys": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "train_shares": {
+        "0": 0.875,
+        "1": 0.02666666666666667,
+        "2": 0.0375,
+        "3": 0.0275,
+        "4": 0.020833333333333332,
+        "5": 0.006666666666666667,
+        "6": 0.0025,
+        "7": 0.0025,
+        "8": 0.0008333333333333334
+      }
+    },
+    "web_touchpoints_90d": {
+      "kind": "quantile",
+      "edges": [
+        "-inf",
+        1.0,
+        3.0,
+        6.0,
+        "inf"
+      ],
+      "keys": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ],
+      "train_shares": {
+        "0": 0.40166666666666667,
+        "1": 0.20583333333333334,
+        "2": 0.24,
+        "3": 0.1525
+      }
+    },
+    "sales_contacts_90d": {
+      "kind": "quantile",
+      "edges": [
+        "-inf",
+        2.0,
+        3.0,
+        "inf"
+      ],
+      "keys": [
+        "0",
+        "1",
+        "2"
+      ],
+      "train_shares": {
+        "0": 0.7091666666666666,
+        "1": 0.1325,
+        "2": 0.15833333333333333
+      }
+    }
+  },
   "note": "Built by scoring training_data.csv with the frozen model. Calibration here is optimistic (the model was fit on these labels). Production should append a new labeled snapshot when 90-day outcomes land \u2014 do not treat this as a live accuracy number."
 }

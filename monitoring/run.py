@@ -5,7 +5,7 @@ Scoring is one cron-shaped job. This is a second cron-shaped job that reads
 scores (and, later, outcomes) and decides whether to keep trusting them.
 
   scoring loop:   new batch -> frozen model -> ranked list -> reps act
-  monitoring:     (now) drift vs training; (later) predicted vs actual convert
+  monitoring:     (now) input/score drift vs training; (later) predicted vs actual convert
                   -> if a check trips N periods in a row -> alert a human
                   -> pause auto-priority / investigate / maybe later retrain
                   retraining is never automatic
@@ -22,6 +22,7 @@ from monitoring.baseline import build_baseline, save_baseline
 from monitoring.checks import (
     calibration_table,
     check_calibration,
+    check_feature_drift,
     check_intent_drift,
     check_p90_drop,
     check_score_drift,
@@ -62,6 +63,7 @@ def _snapshot(
         share_above_bar(scored),
         baseline["share_above_bar"],
     )
+    features = check_feature_drift(scored, baseline.get("feature_baseline"))
     if labeled:
         table = calibration_table(scored)
         cal = check_calibration(table, baseline.get("calibration"))
@@ -77,12 +79,14 @@ def _snapshot(
             "mean_score": score_mean(scored),
             "p90_score": score_p90(scored),
             "share_above_bar": share_above_bar(scored),
+            "feature_max_psi": features.get("max_psi"),
         },
         "checks": {
             "intent_drift": intent,
             "score_drift": score,
             "p90_drop": p90,
             "share_above_bar": share,
+            "feature_drift": features,
             "calibration": cal,
         },
     }
@@ -137,7 +141,14 @@ def run(
 
     consecutive = {
         name: consecutive_trips(history, name)
-        for name in ("intent_drift", "score_drift", "p90_drop", "share_above_bar", "calibration")
+        for name in (
+            "intent_drift",
+            "feature_drift",
+            "score_drift",
+            "p90_drop",
+            "share_above_bar",
+            "calibration",
+        )
     }
     status = _status(consecutive, [train_snap, batch_snap])
     report = render_report(

@@ -17,6 +17,7 @@ from monitoring.checks import (
     share_above_bar,
     weighted_calibration_gap,
 )
+from monitoring.feature_drift import build_feature_baseline
 from monitoring.config import AS_OF, BASELINE_PATH, HIGH_SCORE_BAR
 
 
@@ -38,6 +39,7 @@ def build_baseline(
         "high_score_bar": HIGH_SCORE_BAR,
         "calibration": cal,
         "overall_calibration_gap": weighted_calibration_gap(cal),
+        "feature_baseline": build_feature_baseline(scored),
         "note": (
             "Built by scoring training_data.csv with the frozen model. "
             "Calibration here is optimistic (the model was fit on these labels). "

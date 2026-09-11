@@ -1,4 +1,4 @@
-"""Concrete checks: input/score drift (now) and calibration (when labels exist)."""
+"""Concrete checks: input/score/feature drift (now) and calibration (when labels exist)."""
 
 from __future__ import annotations
 
@@ -9,14 +9,18 @@ import pandas as pd
 from monitoring.config import (
     CALIBRATION_GAP_FLOOR,
     CALIBRATION_GAP_MULT,
+    FEATURE_DRIFT_WATCH_COUNT,
     HIGH_SCORE_BAR,
     INTENT_MISSING_DELTA,
     MIN_BUCKET_N,
     N_SCORE_BUCKETS,
     P90_DROP,
+    PSI_SHIFT,
+    PSI_WATCH,
     SCORE_MEAN_STD_MULT,
     SHARE_ABOVE_BAR_DROP,
 )
+from monitoring.feature_drift import feature_psi_table
 
 
 def _as_converted(series: pd.Series) -> pd.Series:
@@ -182,6 +186,55 @@ def check_share_above_bar(
             f"where actual conversion beat the 6.5% baseline). A 10pp drop "
             f"means fewer accounts clearing a real quality line, even if "
             f"quantile High still has 30 rows."
+        ),
+    }
+
+
+def check_feature_drift(
+    df: pd.DataFrame,
+    feature_baseline: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Trip if mix of *inputs* moved vs training, even when mean score did not.
+
+    Bins are whatever period 0 stored. Re-binning this file would hide the shift.
+    """
+    if not feature_baseline:
+        return {
+            "name": "feature_drift",
+            "tripped": False,
+            "skipped": True,
+            "reason": "no frozen feature baseline",
+            "what": "PSI of model features vs training, bins frozen at period 0.",
+        }
+    table = feature_psi_table(df, feature_baseline)
+    if not table:
+        return {
+            "name": "feature_drift",
+            "tripped": False,
+            "skipped": True,
+            "reason": "no overlapping feature columns",
+            "what": "PSI of model features vs training, bins frozen at period 0.",
+        }
+    max_psi = max(r["psi"] for r in table)
+    n_watch = sum(1 for r in table if r["psi"] > PSI_WATCH)
+    n_shift = sum(1 for r in table if r["psi"] > PSI_SHIFT)
+    tripped = n_shift >= 1 or n_watch >= FEATURE_DRIFT_WATCH_COUNT
+    return {
+        "name": "feature_drift",
+        "tripped": tripped,
+        "skipped": False,
+        "max_psi": max_psi,
+        "n_watch": n_watch,
+        "n_shift": n_shift,
+        "threshold_watch": PSI_WATCH,
+        "threshold_shift": PSI_SHIFT,
+        "features": table,
+        "what": (
+            "Population Stability Index on model features vs training "
+            f"(bins frozen at period 0). Trips if any PSI > {PSI_SHIFT:.2f} "
+            f"or {FEATURE_DRIFT_WATCH_COUNT}+ features > {PSI_WATCH:.2f}. "
+            "Catches mix shifts that cancel in the mean score. "
+            "intent_score uses observed values only; missingness is intent_drift."
         ),
     }
 

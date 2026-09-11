@@ -51,6 +51,12 @@ def render_report(
         _check_md((batch_snapshot.get("checks") or {}).get("intent_drift")),
         _check_md((batch_snapshot.get("checks") or {}).get("score_drift")),
         "",
+        "PSI of model inputs vs training. Bins are frozen at period 0 "
+        "(re-cutting this file would hide the shift). Complements mean-score "
+        "drift: mix can move while the average score stays put.",
+        "",
+        _feature_drift_md((batch_snapshot.get("checks") or {}).get("feature_drift")),
+        "",
         "## Absolute quality (not the call-list tiers)",
         "",
         "Reps still get quantile High/Medium/Low so workload stays ~top 10%. "
@@ -104,6 +110,38 @@ def _check_md(check: dict[str, Any] | None) -> str:
     if "delta" in check and "threshold" in check:
         extra = f" delta={check['delta']:.4f} vs threshold={check['threshold']:.4f}."
     return f"- **{check.get('name')}** — {tripped}{watch}.{extra} {check.get('what', '')}"
+
+
+def _feature_drift_md(check: dict[str, Any] | None) -> str:
+    if not check or check.get("skipped"):
+        return _check_md(check)
+    max_psi = check.get("max_psi")
+    extra = ""
+    if max_psi is not None:
+        extra = (
+            f" max PSI={max_psi:.4f}; "
+            f"{check.get('n_shift', 0)} feature(s) > {check.get('threshold_shift', 0.25):.2f}; "
+            f"{check.get('n_watch', 0)} feature(s) > {check.get('threshold_watch', 0.10):.2f}."
+        )
+    head = (
+        f"- **{check.get('name')}** — "
+        f"{'TRIP' if check.get('tripped') else 'ok'}."
+        f"{extra} {check.get('what', '')}"
+    )
+    rows = check.get("features") or []
+    if not rows:
+        return head
+    lines = [
+        head,
+        "",
+        "| feature | PSI | largest bin move (train -> batch) |",
+        "|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            f"| `{r.get('feature')}` | {r.get('psi', 0):.4f} | {r.get('top_move', '—')} |"
+        )
+    return "\n".join(lines)
 
 
 def _calibration_md(check: dict[str, Any] | None) -> str:

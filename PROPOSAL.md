@@ -40,19 +40,45 @@ Runs: `python run.py`. As-of date is **2026-08-01**, not the clock. New batches 
 
 ## Monitoring
 
-The last Cordilla scorer kept running. Scores stopped matching the field. Nobody was watching the right thing. **Re-scoring every week is not monitoring.** It is fuel for monitoring. Two jobs: `python run.py` then `python monitor.py`.
+The last Cordilla scorer kept running. Scores stopped matching the field. Nobody was watching the right thing. **Re-scoring every week is not monitoring.** It is fuel for monitoring. Two jobs: `python run.py` then `python monitor.py`. Deploy as scheduled jobs, not a graph. This job never calls `fit()`.
 
-**Data quality.** Missing-intent rate vs training (10pp trip). Only intent is missing here.
+### What we watch
 
-**Distribution.** Mean score vs training (0.5 σ). Plus the absolute checks quantile tiers hide:
+| Layer | Check | Needs labels? | When it runs | Trip (then 3 periods in a row) |
+|---|---|---|---|---|
+| Input coverage | `intent_drift` | No | Every batch | Missing-intent rate vs training moves >10pp |
+| Input mix | `feature_drift` | No | Every batch | PSI vs training: any feature >0.25, or 2+ features >0.10. Bins frozen at period 0 |
+| Output / mix | `score_drift` | No | Every batch | Mean score vs training moves >0.5 σ |
+| Output / honesty | `p90_drop` | No | Every batch | 90th-percentile score falls >0.02 vs training |
+| Output / honesty | `share_above_bar` | No | Every batch | Share with score ≥ 0.10 falls >10pp vs training |
+| Outcomes | `calibration` | Yes (`converted_within_90d`) | After the 90-day join | Bucket \|predicted − actual\| > max(3pp, 2× train gap), or high bucket converts worse than low |
 
-- **p90_drop** — this batch’s 90th-percentile score vs training. If p90 falls by more than 0.02, “High” is still top 10% but the best of a worse file.
-- **share_above_bar** — share of accounts with score ≥ **0.10** (the calibration line that beat 6.5%). A 10pp drop means fewer accounts clearing a real bar while the call list still has 30 Highs.
+Architecture: **score this week → compare to a frozen training baseline → write a report.** Label-free checks (top five rows) run on `accounts_to_score.csv` today. Calibration is wired but **skipped** on this 300-row file — no outcomes yet. Period 0 scores `training_data.csv` so the calibration table is real, and optimistic (the model saw those labels).
 
-**Outcomes (when 90-day labels exist).** Bucket predicted vs actual conversion. Trip if a large bucket’s gap exceeds max(3pp, 2× train gap) for **three consecutive** periods, or if high-score accounts convert worse than low-score ones. Training-set calibration is shown as period 0 and will look too good.
+Quantile High/Medium/Low stay on the **call list** so the floor always gets ~30 names. Absolute 0.10 / p90 live in **monitoring**, because relative tiers still print 30 Highs if the whole batch got worse.
 
-**If it pages.** Pause auto-priority by model score. Fall back to trial, then MQLs, then web. Investigate. **Do not auto-retrain.** Retrain is a separate decision.
+### How it is stored
 
-Deploy as two scheduled jobs, not a graph. A well-documented mock LLM is in-scope; a live key is not required.
+**This prototype.** Each scoring run overwrites `prioritized_accounts.csv` and `call_list.md`. Enough to demo one batch. Not how you recover last quarter.
+
+**Production.** Scoring **appends**. Each week writes a dated partition (`account_id`, `scored_at`, `batch_id`, `model_version`, `score`, features as of that Monday). Old weeks stay; last week’s row is never updated. CRM conversions land in a **second** table (`account_id`, `converted_at`). A daily job joins rows where `scored_at + 90 days ≤ today`. Calibration runs on the join. Drift still runs the week you score. Nobody hunts for a CSV. `converted_within_90d` on a batch file here is a stand-in for that join.
+
+### The checks
+
+**Data quality — `intent_drift`.** Missing-intent rate vs training. A coverage jump means scores rest on a different mix (vendor gap, not “low intent”). Only intent is missing on these CSVs.
+
+**Feature mix — `feature_drift`.** PSI of the nine model inputs vs training, bins frozen at period 0 (re-cutting this file would hide the shift). Mean score can stay quiet when shifts cancel; this names which columns moved. `intent_score` PSI uses **observed** values only. Filling 25.3 first would hide the vendor gap.
+
+**Distribution — `score_drift`.** Mean model score vs training (0.5 σ). Catches a silent mix shift (smaller companies, fewer trials) before labels exist.
+
+**Absolute quality — `p90_drop` and `share_above_bar`.** Call-list High is always top 10% of *this* file. If p90 drops >0.02, those Highs are relatively less-bad, not still above the historical bar. If the share with score ≥ **0.10** (the line that beat the 6.5% baseline) falls >10pp, fewer accounts clear a real quality line while the list still has 30 Highs.
+
+**Outcomes — `calibration`.** Bucket predicted vs actual conversion. Trip if a large bucket’s gap exceeds max(3pp, 2× train gap) for three consecutive periods, or if high-score accounts convert worse than low-score ones. This is the quiet failure that burned the last scorer.
+
+### If it pages
+
+Pause auto-priority by model score. Fall back to trial, then MQLs, then web. Investigate. **Do not auto-retrain.** Retrain is a separate decision.
+
+A well-documented mock LLM is in-scope; a live key is not required.
 
 ---

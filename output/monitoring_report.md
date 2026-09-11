@@ -32,6 +32,22 @@ Source: `D:\job\dialpad\cordillaAccountScoring\data\accounts_to_score.csv` (n=30
 - **intent_drift** — ok. delta=0.0150 vs threshold=0.1000. Share of accounts with missing intent_score vs training. A coverage jump means scores are resting on a different mix (vendor gap, not 'low intent').
 - **score_drift** — ok. delta=0.0006 vs threshold=0.0158. Mean model score vs training. Catches a silent mix shift (smaller companies, fewer trials) before labels exist.
 
+PSI of model inputs vs training. Bins are frozen at period 0 (re-cutting this file would hide the shift). Complements mean-score drift: mix can move while the average score stays put.
+
+- **feature_drift** — ok. max PSI=0.0465; 0 feature(s) > 0.25; 0 feature(s) > 0.10. Population Stability Index on model features vs training (bins frozen at period 0). Trips if any PSI > 0.25 or 2+ features > 0.10. Catches mix shifts that cancel in the mean score. intent_score uses observed values only; missingness is intent_drift.
+
+| feature | PSI | largest bin move (train -> batch) |
+|---|---|---|
+| `intent_score` | 0.0465 | [-inf, 13.6) 20.2% -> 14.7% |
+| `employee_count` | 0.0305 | [165, inf) 19.9% -> 14.7% |
+| `trial_active_users` | 0.0230 | 0 87.5% -> 89.7% |
+| `industry` | 0.0211 | Healthcare 16.3% -> 13.0% |
+| `mql_count_90d` | 0.0174 | [-inf, 1) 69.1% -> 63.0% |
+| `web_touchpoints_90d` | 0.0131 | [-inf, 1) 40.2% -> 45.3% |
+| `sales_contacts_90d` | 0.0109 | [2, 3) 13.2% -> 10.0% |
+| `account_type` | 0.0031 | Former Customer 13.8% -> 12.0% |
+| `trial_started` | 0.0025 | 0 81.4% -> 83.3% |
+
 ## Absolute quality (not the call-list tiers)
 
 Reps still get quantile High/Medium/Low so workload stays ~top 10%. These two checks catch the case where that top 10% is quietly worse than the bar that beat baseline conversion on training data.
@@ -48,6 +64,7 @@ Reps still get quantile High/Medium/Low so workload stays ~top 10%. These two ch
 Alert the model owner only if a check trips **3 periods in a row**. One noisy week is not the failure mode. A quiet mismatch over a quarter is.
 
 - `intent_drift`: not yet
+- `feature_drift`: not yet
 - `score_drift`: not yet
 - `p90_drop`: not yet
 - `share_above_bar`: not yet

@@ -8,7 +8,8 @@
       "intent_missing_rate": 0.40166666666666667,
       "mean_score": 0.06614231665297247,
       "p90_score": 0.10882728170656078,
-      "share_above_bar": 0.14166666666666666
+      "share_above_bar": 0.14166666666666666,
+      "feature_max_psi": 0.0
     },
     "checks": {
       "intent_drift": {
@@ -47,6 +48,73 @@
         "threshold": 0.1,
         "bar": 0.1,
         "what": "Share of accounts with score \u2265 0.10 (the calibration bar where actual conversion beat the 6.5% baseline). A 10pp drop means fewer accounts clearing a real quality line, even if quantile High still has 30 rows."
+      },
+      "feature_drift": {
+        "name": "feature_drift",
+        "tripped": false,
+        "skipped": false,
+        "max_psi": 0.0,
+        "n_watch": 0,
+        "n_shift": 0,
+        "threshold_watch": 0.1,
+        "threshold_shift": 0.25,
+        "features": [
+          {
+            "feature": "account_type",
+            "kind": "categorical",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "industry",
+            "kind": "categorical",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "employee_count",
+            "kind": "quantile",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "intent_score",
+            "kind": "quantile",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "mql_count_90d",
+            "kind": "quantile",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "trial_started",
+            "kind": "discrete",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "trial_active_users",
+            "kind": "discrete",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "web_touchpoints_90d",
+            "kind": "quantile",
+            "psi": 0.0,
+            "top_move": "no shift"
+          },
+          {
+            "feature": "sales_contacts_90d",
+            "kind": "quantile",
+            "psi": 0.0,
+            "top_move": "no shift"
+          }
+        ],
+        "what": "Population Stability Index on model features vs training (bins frozen at period 0). Trips if any PSI > 0.25 or 2+ features > 0.10. Catches mix shifts that cancel in the mean score. intent_score uses observed values only; missingness is intent_drift."
       },
       "calibration": {
         "name": "calibration",
@@ -99,7 +167,8 @@
       "intent_missing_rate": 0.38666666666666666,
       "mean_score": 0.06553634311584183,
       "p90_score": 0.1063430830271232,
-      "share_above_bar": 0.12333333333333334
+      "share_above_bar": 0.12333333333333334,
+      "feature_max_psi": 0.04646266085282947
     },
     "checks": {
       "intent_drift": {
@@ -138,6 +207,73 @@
         "threshold": 0.1,
         "bar": 0.1,
         "what": "Share of accounts with score \u2265 0.10 (the calibration bar where actual conversion beat the 6.5% baseline). A 10pp drop means fewer accounts clearing a real quality line, even if quantile High still has 30 rows."
+      },
+      "feature_drift": {
+        "name": "feature_drift",
+        "tripped": false,
+        "skipped": false,
+        "max_psi": 0.04646266085282947,
+        "n_watch": 0,
+        "n_shift": 0,
+        "threshold_watch": 0.1,
+        "threshold_shift": 0.25,
+        "features": [
+          {
+            "feature": "intent_score",
+            "kind": "quantile",
+            "psi": 0.04646266085282947,
+            "top_move": "[-inf, 13.6) 20.2% -> 14.7%"
+          },
+          {
+            "feature": "employee_count",
+            "kind": "quantile",
+            "psi": 0.030470376664411866,
+            "top_move": "[165, inf) 19.9% -> 14.7%"
+          },
+          {
+            "feature": "trial_active_users",
+            "kind": "discrete",
+            "psi": 0.023002415815511393,
+            "top_move": "0 87.5% -> 89.7%"
+          },
+          {
+            "feature": "industry",
+            "kind": "categorical",
+            "psi": 0.021082605741715908,
+            "top_move": "Healthcare 16.3% -> 13.0%"
+          },
+          {
+            "feature": "mql_count_90d",
+            "kind": "quantile",
+            "psi": 0.017448930487788134,
+            "top_move": "[-inf, 1) 69.1% -> 63.0%"
+          },
+          {
+            "feature": "web_touchpoints_90d",
+            "kind": "quantile",
+            "psi": 0.01309970648544105,
+            "top_move": "[-inf, 1) 40.2% -> 45.3%"
+          },
+          {
+            "feature": "sales_contacts_90d",
+            "kind": "quantile",
+            "psi": 0.010930217713226605,
+            "top_move": "[2, 3) 13.2% -> 10.0%"
+          },
+          {
+            "feature": "account_type",
+            "kind": "categorical",
+            "psi": 0.0031340564062100956,
+            "top_move": "Former Customer 13.8% -> 12.0%"
+          },
+          {
+            "feature": "trial_started",
+            "kind": "discrete",
+            "psi": 0.002532358110485862,
+            "top_move": "0 81.4% -> 83.3%"
+          }
+        ],
+        "what": "Population Stability Index on model features vs training (bins frozen at period 0). Trips if any PSI > 0.25 or 2+ features > 0.10. Catches mix shifts that cancel in the mean score. intent_score uses observed values only; missingness is intent_drift."
       },
       "calibration": {
         "name": "calibration",

@@ -28,6 +28,17 @@ HIGH_SCORE_BAR = 0.10
 P90_DROP = 0.02  # alert if this batch's 90th percentile is 2pp+ below training
 SHARE_ABOVE_BAR_DROP = 0.10  # 10pp fewer accounts clearing 0.10 vs training
 
+# Feature (covariate) drift — PSI vs training, bins frozen at period 0.
+# Score mean can stay quiet if input shifts cancel. This names which columns moved.
+# Credit-ish cutoffs; n=300 is noisy so trip needs 3 consecutive periods like the rest.
+PSI_N_BINS = 5
+PSI_RARE_CATEGORY = 0.05  # lump train share <5% (and unseen labels) into __other__
+PSI_FLOOR = 0.005  # empty-bin floor so ln(0) does not explode
+PSI_WATCH = 0.10
+PSI_SHIFT = 0.25
+# Trip if any feature PSI > SHIFT, or two+ features PSI > WATCH.
+FEATURE_DRIFT_WATCH_COUNT = 2
+
 # Calibration: |mean predicted − actual conversion| in a bucket.
 # Floor 3pp so we don't trip on 0.4% vs 0.6% with tiny base rates.
 # Also trip if 2× the training-set gap for that bucket (once labels exist).

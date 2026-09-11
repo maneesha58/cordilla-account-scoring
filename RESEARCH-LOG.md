@@ -408,3 +408,18 @@ Replaced the weaker “14–17% / a few more conversions” framing with the his
 
 ---
 
+## 2026-09-10 — Session 11: feature drift (PSI)
+
+Added a label-free **feature_drift** check. Score mean / p90 / share-above-0.10 watch the *output*. They miss compensating mix shifts (fewer trials, more MQLs, mean score unchanged). PSI on the nine model features vs training, **bins frozen at period 0**.
+
+Rules (in `monitoring/config.py`):
+
+- Categorical (`account_type`, `industry`): train shares; categories with train mass <5% (and unseen labels) lump to `__other__`.
+- Numeric: 5 quantile bins from train, edges opened to ±inf so out-of-range batch values land in the tails. Features with ≤5 distinct values (`trial_started`, `trial_active_users`) stay discrete.
+- `intent_score` PSI is **observed values only**. Missingness stays `intent_drift`. Do not impute 25.3 first.
+- Empty-bin floor 0.5%. Trip if any PSI > 0.25 or 2+ features > 0.10. Same 3 consecutive periods. No auto-retrain.
+
+This 300-row batch: max PSI **0.046** (`intent_score` lowest bin 20.2% → 14.7%). No feature above 0.10. Status still **OK**. Train-vs-train PSI is 0 (sanity).
+
+---
+
